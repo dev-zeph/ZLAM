@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +24,7 @@ interface DocumentContext {
   ai_summary?: string
 }
 
-export default function AIChatPage() {
+function AIChatContent() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -46,7 +46,7 @@ export default function AIChatPage() {
     const initializeChat = async () => {
       try {
         // Get document IDs from URL params
-        const docIds = searchParams.get('documents')?.split(',') || []
+        const docIds = searchParams?.get('documents')?.split(',') || []
         
         if (docIds.length > 0) {
           // Fetch document details
@@ -316,5 +316,17 @@ export default function AIChatPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AIChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <AIChatContent />
+    </Suspense>
   )
 }
