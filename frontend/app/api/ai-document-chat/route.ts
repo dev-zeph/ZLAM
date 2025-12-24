@@ -51,6 +51,20 @@ export async function POST(request: NextRequest) {
         throw docError
       }
 
+      console.log('Document data retrieved:', {
+        fileName: docData.file_name,
+        hasSummary: !!docData.ai_summary,
+        summaryLength: docData.ai_summary?.length || 0,
+        summaryPreview: docData.ai_summary?.substring(0, 100) + '...' || 'No summary'
+      })
+
+      // DEBUG: Log the full analysis content
+      if (docData.ai_summary && docData.ai_summary.length > 0) {
+        console.log('=== DEBUG: Full AI Summary Content ===')
+        console.log(docData.ai_summary)
+        console.log('=== END DEBUG ===')
+      }
+
       // Extract file path from the URL
       // URL format: https://xxx.supabase.co/storage/v1/object/public/documents/category/filename
       const urlParts = docData.file_url.split('/')
@@ -67,23 +81,41 @@ export async function POST(request: NextRequest) {
       const isPdf = document.file_name.toLowerCase().endsWith('.pdf')
       
       if (isPdf) {
-        console.log('Processing PDF file...')
+        console.log('Processing PDF file for AI chat...')
         
-        // For now, let's use a simpler approach
-        // Try to use existing AI summary if available, otherwise provide guidance
-        if (docData.ai_summary) {
-          documentContent = `Document Summary: ${docData.ai_summary}\n\nNote: This is a summary of the PDF content. For more detailed analysis, please share specific excerpts from the document.`
-        } else {
+        // Check if we have an existing AI summary to work with
+        if (docData.ai_summary && docData.ai_summary.trim().length > 0) {
+          console.log('Using existing AI summary as document context, length:', docData.ai_summary.length)
           documentContent = `Document: ${document.file_name} (Category: ${document.category})
 
-This is a PDF document. While I can help analyze legal documents, I currently need you to share specific text excerpts from the document for detailed analysis. 
+COMPREHENSIVE DOCUMENT ANALYSIS:
+${docData.ai_summary}
 
-You can help by:
-1. Copy and paste specific sections you'd like me to analyze
-2. Ask about general legal concepts related to ${document.category} documents
-3. Share key details like names, dates, or clauses you'd like me to explain
+Based on this detailed analysis, I can answer specific questions about:
+- Names and parties involved
+- Key dates and deadlines  
+- Financial terms and amounts
+- Important clauses and provisions
+- Document purpose and content
+- Obligations and requirements
 
-I'm here to help with legal document analysis once you provide the relevant text!`
+Ask me anything about this document!`
+        } else {
+          console.log('No AI summary available - document needs analysis first')
+          documentContent = `Document: ${document.file_name} (Category: ${document.category})
+
+STATUS: This document has not been analyzed yet.
+
+To enable detailed Q&A about the document content, please:
+1. Use the "Analyze Document" button in the chat interface
+2. Once analyzed, I'll be able to answer specific questions about names, dates, clauses, financial terms, and other document details
+
+I can currently help with:
+- General questions about ${document.category} document types
+- Legal concepts and terminology
+- Guidance on what to look for in documents
+
+Would you like me to analyze the document first, or do you have general questions I can help with?`
         }
       } else {
         // For non-PDF files, use existing summary or metadata
@@ -107,28 +139,32 @@ I'm here to help with legal document analysis once you provide the relevant text
     // Build conversation context
     const systemPrompt = `You are an AI assistant specializing in legal document analysis. You're helping a user understand and analyze the document "${document.file_name}" (Category: ${document.category}).
 
-Available document information:
+DOCUMENT ANALYSIS CONTENT:
 ${documentContent}
 
+CRITICAL INSTRUCTIONS:
+- You MUST reference and use the specific information from the DOCUMENT ANALYSIS CONTENT above
+- When the user asks about "who is involved", extract the actual names and parties from the analysis content
+- When asked about dates, amounts, clauses, or any specific details, provide the EXACT information from the analysis
+- Do NOT give generic or template responses - use the actual document content provided above
+- If the analysis contains specific names, dates, amounts, or details, cite them directly in your response
+
 Your role is to:
-1. Help analyze the document based on available information and user-provided content
-2. Provide legal analysis and insights (with appropriate disclaimers)
-3. Identify key clauses, dates, parties, and obligations when provided
-4. Explain legal terminology and concepts
-5. Help with document review and understanding
-6. Suggest action items or important considerations
-7. Guide users on what information to share for better analysis
+1. Extract and present specific information from the document analysis provided above
+2. Answer questions using ONLY the actual content and details from the analysis
+3. Identify and cite specific names, dates, parties, amounts, and clauses from the analysis
+4. Explain specific terms and provisions found in this particular document
+5. Provide insights based on the actual content of this specific document
 
-Important guidelines:
-- Work with available document information and user-provided excerpts
-- When users share text from the document, analyze it thoroughly
-- Always provide legal disclaimers when giving legal analysis
-- Be thorough but concise in your responses
-- If you need more information, guide the user on what to share
-- Ask clarifying questions when helpful
-- Maintain a professional, helpful tone
+Response Guidelines:
+- Always reference the specific content from the analysis above
+- If asked "who is involved", list the actual names and parties from the analysis
+- If asked about amounts or dates, provide the specific figures from the analysis  
+- If asked about clauses, quote or summarize the actual provisions from the analysis
+- If the analysis doesn't contain certain information, state that clearly
+- Include legal disclaimers that this is for informational purposes only
 
-Remember: Always include appropriate disclaimers that your analysis is for informational purposes only and does not constitute legal advice. Encourage users to share specific document content for detailed analysis.`
+Remember: You have access to a comprehensive analysis of this specific document. Use the ACTUAL content and details from that analysis, not generic responses.`
 
     // Prepare messages for OpenAI
     const messages: any[] = [
