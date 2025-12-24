@@ -72,6 +72,8 @@ export default function DocumentVault() {
     const formData = new FormData(event.currentTarget)
     const file = formData.get('file') as File
     const category = formData.get('category') as string
+    const documentName = formData.get('document_name') as string
+    const description = formData.get('description') as string
 
     if (!file) {
       alert('Please select a file')
@@ -103,6 +105,8 @@ export default function DocumentVault() {
           file_name: file.name,
           file_url: publicUrl,
           category: category,
+          document_name: documentName,
+          description: description || null, // Use null for empty descriptions
         })
 
       if (insertError) throw insertError
@@ -283,6 +287,28 @@ export default function DocumentVault() {
                   type="file"
                   accept=".pdf,.doc,.docx,.txt"
                   required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="document_name">Document Name</Label>
+                <Input
+                  id="document_name"
+                  name="document_name"
+                  type="text"
+                  placeholder="Enter a descriptive name for the document"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <textarea
+                  id="description"
+                  name="description"
+                  className="w-full p-2 border border-gray-300 rounded-md min-h-[80px] resize-vertical"
+                  placeholder="Brief description of the document content (optional)"
+                  rows={3}
                 />
               </div>
               

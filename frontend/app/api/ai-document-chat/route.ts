@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     try {
       // Get document details first to extract file path
       const { data: docData, error: docError } = await supabase
-        .from('documents_view')
+        .from('documents')
         .select('file_url, file_name, ai_summary')
         .eq('id', document.id)
         .single()
@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
         fileName: docData.file_name,
         hasSummary: !!docData.ai_summary,
         summaryLength: docData.ai_summary?.length || 0,
-        summaryPreview: docData.ai_summary?.substring(0, 100) + '...' || 'No summary'
+        summaryPreview: docData.ai_summary?.substring(0, 100) + '...' || 'No summary',
+        fileUrl: docData.file_url
       })
 
       // DEBUG: Log the full analysis content

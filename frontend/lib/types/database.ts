@@ -100,6 +100,8 @@ export interface Database {
           ai_summary: string | null
           uploaded_by: string | null
           created_at: string
+          document_name: string
+          description: string | null
         }
         Insert: {
           id?: string
@@ -110,6 +112,8 @@ export interface Database {
           ai_summary?: string | null
           uploaded_by?: string | null
           created_at?: string
+          document_name: string
+          description?: string | null
         }
         Update: {
           id?: string
@@ -120,6 +124,8 @@ export interface Database {
           ai_summary?: string | null
           uploaded_by?: string | null
           created_at?: string
+          document_name?: string
+          description?: string | null
         }
       }
       notification_logs: {

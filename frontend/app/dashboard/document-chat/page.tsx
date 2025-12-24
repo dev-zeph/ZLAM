@@ -14,7 +14,8 @@ import {
   Send, 
   FileText, 
   ArrowLeft,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react'
 import Link from 'next/link'
 import type { DocumentView } from '@/lib/types/database'
@@ -67,7 +68,7 @@ export default function DocumentChatPage() {
         console.log('Current user:', user?.email || 'Not authenticated')
         
         const { data, error } = await supabase
-          .from('documents_view')
+          .from('documents')
           .select('*')
           .eq('id', documentId)
           .single()
@@ -284,7 +285,7 @@ What would you like to know about the document?`,
       // Also refresh document from database to ensure consistency
       try {
         const { data: refreshedData } = await supabase
-          .from('documents_view')
+          .from('documents')
           .select('*')
           .eq('id', document.id)
           .single()
@@ -330,6 +331,47 @@ The analysis is based on the text excerpt you provided. What would you like to k
       setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const copyToExcerpt = () => {
+    // This function can be removed since we'll use direct chat input
+  }
+
+  const openDocumentInNewTab = async () => {
+    if (!document?.file_url) return
+
+    try {
+      // Extract the file path from the URL
+      const urlParts = document.file_url.split('/')
+      const bucketIndex = urlParts.findIndex(part => part === 'documents')
+      
+      if (bucketIndex === -1) {
+        // If we can't parse the URL, try opening it directly
+        window.open(document.file_url, '_blank')
+        return
+      }
+      
+      const filePath = urlParts.slice(bucketIndex + 1).join('/')
+      console.log('Opening document with file path:', filePath)
+      
+      // Get signed URL for secure access
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(filePath, 3600) // 1 hour expiry
+      
+      if (error) {
+        console.error('Error creating signed URL:', error)
+        // Fallback to original URL
+        window.open(document.file_url, '_blank')
+      } else {
+        console.log('Opening signed URL:', data.signedUrl)
+        window.open(data.signedUrl, '_blank')
+      }
+    } catch (error) {
+      console.error('Error opening document:', error)
+      // Final fallback
+      window.open(document.file_url, '_blank')
     }
   }
 
@@ -384,9 +426,19 @@ The analysis is based on the text excerpt you provided. What would you like to k
               </div>
             </div>
           </div>
-          <Badge variant="secondary" className="capitalize">
-            {document.category}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={openDocumentInNewTab}
+              variant="outline"
+              size="sm"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Document
+            </Button>
+            <Badge variant="secondary" className="capitalize">
+              {document.category}
+            </Badge>
+          </div>
         </div>
       </div>
 
@@ -500,19 +552,26 @@ The analysis is based on the text excerpt you provided. What would you like to k
                       </div>
                     </div>
                     
-                    {/* PDF Excerpt Input */}
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="mb-2">
-                        <p className="text-sm font-medium text-amber-900">
-                          📄 PDF Content Analysis
-                        </p>
-                        <p className="text-xs text-amber-700">
-                          For detailed PDF analysis, paste key text sections below (names, dates, clauses, etc.)
-                        </p>
+                    {/* Simple Copy-Paste Instructions */}
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-medium text-amber-900 mb-2">
+                            📄 For Detailed PDF Analysis
+                          </h4>
+                          <div className="text-xs text-amber-800 space-y-1">
+                            <p><strong>Step 1:</strong> Click "View Document" button above (opens in new tab)</p>
+                            <p><strong>Step 2:</strong> In the new tab, select all text (Ctrl+A or Cmd+A)</p>
+                            <p><strong>Step 3:</strong> Copy the text (Ctrl+C or Cmd+C)</p>
+                            <p><strong>Step 4:</strong> Return here, paste below, and click "Analyze PDF Content"</p>
+                          </div>
+                        </div>
                       </div>
+                      
                       <textarea
-                        placeholder="Paste key sections of the PDF here for comprehensive analysis... Example: 'Lease Agreement between John Doe (Landlord) and Jane Smith (Tenant) for property at 5469 Victoria Rd, dated March 1, 2024, monthly rent $2,500...'"
-                        className="w-full h-24 p-2 text-sm border border-amber-300 rounded resize-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        placeholder="Paste document content here for comprehensive analysis... (Ctrl+V or Cmd+V)"
+                        className="w-full h-24 mt-3 p-3 text-sm border border-amber-300 rounded-md resize-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         value={documentExcerpt}
                         onChange={(e) => setDocumentExcerpt(e.target.value)}
                         disabled={isAnalyzing}
@@ -520,17 +579,17 @@ The analysis is based on the text excerpt you provided. What would you like to k
                       <Button 
                         onClick={analyzeWithExcerpt} 
                         disabled={isAnalyzing || !documentExcerpt.trim()}
-                        className="w-full mt-2"
+                        className="w-full mt-3"
                         size="sm"
                       >
                         {isAnalyzing ? (
                           <>
-                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Analyzing Content...
                           </>
                         ) : (
                           <>
-                            <FileText className="mr-2 h-3 w-3" />
+                            <FileText className="mr-2 h-4 w-4" />
                             Analyze PDF Content
                           </>
                         )}

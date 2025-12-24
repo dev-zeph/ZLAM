@@ -38,6 +38,7 @@ export default function PropertyManager() {
   const [propertyTenants, setPropertyTenants] = useState<PropertyTenantsView[]>([])
   const [selectedTenant, setSelectedTenant] = useState<PropertyTenantsView | null>(null)
   const [loading, setLoading] = useState(true)
+  const [userRole, setUserRole] = useState<'staff' | 'client'>('staff') // Default to staff
   
   // Dialog states
   const [addPropertyDialogOpen, setAddPropertyDialogOpen] = useState(false)
@@ -45,6 +46,33 @@ export default function PropertyManager() {
   const [tenantDetailsSheetOpen, setTenantDetailsSheetOpen] = useState(false)
   
   const supabase = createClient()
+
+  // Check user role on component mount
+  useEffect(() => {
+    checkUserRole()
+  }, [])
+
+  const checkUserRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user?.email) {
+        // Simple role determination - you can enhance this logic
+        // For now, treating emails with 'client' in them as clients, others as staff
+        if (user.email.includes('client') || user.user_metadata?.role === 'client') {
+          setUserRole('client')
+        } else {
+          setUserRole('staff')
+        }
+        
+        // Debug log to see what role is being set
+        console.log('User role set to:', user.email.includes('client') || user.user_metadata?.role === 'client' ? 'client' : 'staff')
+        console.log('User email:', user.email)
+        console.log('User metadata:', user.user_metadata)
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error)
+    }
+  }
 
   useEffect(() => {
     fetchProperties()
@@ -162,13 +190,18 @@ export default function PropertyManager() {
       }
 
       // Now create the tenant with current database structure
-      const newTenant = {
+      const newTenant: any = {
         unit_id: unitId,
         full_name: formData.get('full_name') as string,
         email: formData.get('email') as string,
         phone_number: formData.get('phone_number') as string || null,
         rent_due_date: formData.get('rent_due_date') as string,
         reminder_status: 'active',
+      }
+
+      // Only include yearly_rent_amount if user is staff (field exists in form)
+      if (userRole === 'staff') {
+        newTenant.yearly_rent_amount = parseFloat(formData.get('yearly_rent_amount') as string) || null
       }
 
       console.log('Attempting to add tenant:', newTenant)
@@ -213,9 +246,13 @@ export default function PropertyManager() {
       full_name: formData.get('full_name') as string,
       email: formData.get('email') as string,
       phone_number: formData.get('phone_number') as string || null,
-      yearly_rent_amount: parseFloat(formData.get('yearly_rent_amount') as string) || null,
       rent_due_date: formData.get('rent_due_date') as string,
       reminder_status: formData.get('reminder_status') as string,
+    }
+
+    // Only include yearly_rent_amount if user is staff (field exists in form)
+    if (userRole === 'staff') {
+      updateData.yearly_rent_amount = parseFloat(formData.get('yearly_rent_amount') as string) || null
     }
 
     try {
@@ -328,15 +365,18 @@ export default function PropertyManager() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Annual Rent</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₦{stats.totalRentAmount.toLocaleString()}</div>
-            </CardContent>
-          </Card>
+          {/* Only show Annual Rent for staff users */}
+          {userRole === 'staff' && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Annual Rent</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">₦{stats.totalRentAmount.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -375,7 +415,8 @@ export default function PropertyManager() {
                   <TableRow>
                     <TableHead>Tenant</TableHead>
                     <TableHead>Contact</TableHead>
-                    <TableHead>Annual Rent</TableHead>
+                    {/* Only show Annual Rent column for staff users */}
+                    {userRole === 'staff' && <TableHead>Annual Rent</TableHead>}
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -401,11 +442,14 @@ export default function PropertyManager() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="font-medium">
-                          {tenant.yearly_rent_amount ? `₦${tenant.yearly_rent_amount.toLocaleString()}` : 'Not set'}
-                        </div>
-                      </TableCell>
+                      {/* Only show Annual Rent cell for staff users */}
+                      {userRole === 'staff' && (
+                        <TableCell>
+                          <div className="font-medium">
+                            {tenant.yearly_rent_amount ? `₦${tenant.yearly_rent_amount.toLocaleString()}` : 'Not set'}
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div>
                           <p className="font-medium">
@@ -476,16 +520,19 @@ export default function PropertyManager() {
                   <Input id="phone_number" name="phone_number" type="tel" />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="yearly_rent_amount">Annual Rent (₦)</Label>
-                  <Input 
-                    id="yearly_rent_amount" 
-                    name="yearly_rent_amount" 
-                    type="number" 
-                    step="0.01"
-                    placeholder="e.g., 1200000"
-                  />
-                </div>
+                {/* Only show Annual Rent field for staff users */}
+                {userRole === 'staff' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="yearly_rent_amount">Annual Rent (₦)</Label>
+                    <Input 
+                      id="yearly_rent_amount" 
+                      name="yearly_rent_amount" 
+                      type="number" 
+                      step="0.01"
+                      placeholder="e.g., 1200000"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="rent_due_date">Rent Due Date*</Label>
@@ -547,17 +594,20 @@ export default function PropertyManager() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="edit_yearly_rent_amount">Annual Rent (₦)</Label>
-                    <Input
-                      id="edit_yearly_rent_amount"
-                      name="yearly_rent_amount"
-                      type="number"
-                      step="0.01"
-                      defaultValue={selectedTenant.yearly_rent_amount || ''}
-                      placeholder="e.g., 1200000"
-                    />
-                  </div>
+                  {/* Only show Annual Rent field for staff users */}
+                  {userRole === 'staff' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="edit_yearly_rent_amount">Annual Rent (₦)</Label>
+                      <Input
+                        id="edit_yearly_rent_amount"
+                        name="yearly_rent_amount"
+                        type="number"
+                        step="0.01"
+                        defaultValue={selectedTenant.yearly_rent_amount || ''}
+                        placeholder="e.g., 1200000"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="edit_rent_due_date">Rent Due Date*</Label>
