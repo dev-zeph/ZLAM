@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -27,9 +27,9 @@ interface ChatMessage {
   timestamp: Date
 }
 
-export default function DocumentChatPage() {
+function DocumentChatContent() {
   const searchParams = useSearchParams()
-  const documentId = searchParams.get('id')
+  const documentId = searchParams?.get('id')
   
   const [document, setDocument] = useState<DocumentView | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -721,5 +721,20 @@ The analysis is based on the text excerpt you provided. What would you like to k
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function DocumentChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="text-gray-500">Loading document chat...</p>
+        </div>
+      </div>
+    }>
+      <DocumentChatContent />
+    </Suspense>
   )
 }
